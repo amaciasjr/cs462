@@ -21,4 +21,3 @@ A first ruleset for the Quickstart
     send_directive("say", {"something": "Hello World"})
   }
   
-}
