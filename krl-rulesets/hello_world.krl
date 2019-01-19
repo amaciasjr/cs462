@@ -2,9 +2,9 @@ ruleset hello_world {
   meta {
     name "Hello World"
     description <<
-A first ruleset for the Quickstart
+This ruleset was used to complete Lab 1.
 >>
-    author "Phil Windley"
+    author "Art Macias"
     logging on
     shares hello, __testing
   }
