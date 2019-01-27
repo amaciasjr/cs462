@@ -1,4 +1,4 @@
-ruleset twilio {
+ruleset io.picolabs.twilio_module {
   meta {
     name "Twilio Module"
     description <<
@@ -6,32 +6,19 @@ ruleset twilio {
     >>
     author "Art Macias"
     logging on
-    shares __testing
-  }
-
-  global {
     
-    send_sms = defaction(to, from, message, account_sid, auth_token) {
-      base_url = <<https://#{account_sid}:#{auth_token}@api.twilio.com/2010-04-01/Accounts/#{account_sid}/>>
-      http:post(base_url + "Messages.json", form =
-                {"From":from,
-                 "To":to,
-                 "Body":message
-                })
-    }
     
-    __testing = { 
-      "queries": [ ],
-      "events": [ ]
-    }
+    use module io.picolabs.twilio_keys
+    use module io.picolabs.twilio_test alias twilio_secrets 
+        with account_sid = keys:twilio_secrets{ "account_sid" }
+             auth_token =  keys:twilio_secrets{ "auth_token" }
   }
   
   rule test_send_sms {
-   select when test new_message
-    send_sms(event:attr("to"),
-             event:attr("from"),
-             event:attr("message"),
-             event:attr("account_sid"),
-             event:attr("auth_token"))
+    select when test new_message
+    twilio_secrets:send_sms (event:attr("to"),
+                    event:attr("from"),
+                    event:attr("message")
+                   )
   }
 }
