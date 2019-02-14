@@ -1,6 +1,7 @@
 ruleset wovyn_base {
   meta {
     shares __testing
+    provides temperature_threshold
   }
   global {
     __testing = { 
@@ -17,6 +18,8 @@ ruleset wovyn_base {
     temperature_threshold = 70
     send_to_num = "+13039018143"
     send_from_num = "+17206056876"
+    
+    
   }
   
   rule process_heartbeat {
@@ -77,7 +80,7 @@ ruleset wovyn_base {
     // POSTLUDE SECTION
     fired {
       raise test event "new_message"
-        attributes { "to": send_to_num, "from": send_from_num, "message" : "Wovyn is in a hot room!" }
+        attributes { "to": send_to_num, "from": send_from_num, "message" : "KENT is it hot in the living room? - Art" }
     }
     else{
       
