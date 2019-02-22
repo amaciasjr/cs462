@@ -1,7 +1,7 @@
 ruleset wovyn_base {
   meta {
-    shares __testing
-    provides temperature_threshold
+    shares __testing, location, name, temp_name, temp_location
+    provides temperature_threshold, send_to_num, temp_name, temp_location, location, name
   }
   global {
     __testing = { 
@@ -18,6 +18,16 @@ ruleset wovyn_base {
     temperature_threshold = 70
     send_to_num = "+13039018143"
     send_from_num = "+17206056876"
+    temp_location = "Provo"
+    temp_name = "Wovyn_16703A"
+    
+    location = function() {
+      ent:sensor_loc.defaultsTo("Unknown Location")
+    };
+    
+    name = function() {
+      ent:sensor_name.defaultsTo("No Name")
+    };
     
     
   }
@@ -29,6 +39,8 @@ ruleset wovyn_base {
       never_used = event:attrs.klog("ALL attrs")
       // has_genericThing = event:attr("genericThing").klog("GENERIC THING INFO: ")
       current_time = time:now()
+      given_location = location => event:attrs{["property", "location", "description"]} | location()
+      given_name = name => event:attrs{["property", "name"]} | name()
       has_temp_array = event:attrs{["genericThing", "data", "temperature"]}.klog("Temperature ARRAY INFO: ")
       temp = has_temp_array[0]{"temperatureF"}
     }
@@ -38,6 +50,8 @@ ruleset wovyn_base {
       
     // POSTLUDE SECTION
     fired {
+      ent:sensor_loc := given_location;
+      ent:sensor_name := given_name;
       // raise <domain> event <"type">
       raise wovyn event "new_temperature_reading"
         attributes { "temperature": temp, "timestamp": current_time }
@@ -80,7 +94,7 @@ ruleset wovyn_base {
     // POSTLUDE SECTION
     fired {
       raise test event "new_message"
-        attributes { "to": send_to_num, "from": send_from_num, "message" : "KENT is it hot in the living room? - Art" }
+        attributes { "to": send_to_num, "from": send_from_num, "message" : "Here's another one." }
     }
     else{
       
