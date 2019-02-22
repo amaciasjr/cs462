@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+    <head>
+    <title>Art's Sensor SPA</title>
+    <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+    <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.2.19/angular.min.js"></script>
+    <script src="sensor.js"></script>
+    <style type="text/css">
+        span.finished { cursor: pointer; color: blue; text-decoration: underline; }
+        div.eci input { visibility: hidden; }
+        div.eci:hover input { visibility: visible; }
+    </style>
+</head>
+
+<body ng-app="sensorProfile" ng-controller="MainCtrl">
+    <div class="row">
+        <div class="col-md-8 col-md-offset-2">
+            <div class="page-header"> 
+                <h1>Sensor Profile App</h1>
+            </div>
+
+            <form ng-hide="hide" ng-submit="updateProfile()" style="margin:20px 0;">
+                    <label for="threshold">Threshold</label>
+                    <input type="text" id="threshold" ng-model="threshold" placeholder="threshold"></input>
+                    <label for="location">Location</label>
+                    <input type="text" id="location" ng-model="location" placeholder="location"></input>
+                    <label for="name">Name</label>
+                    <input type="text" id="name" ng-model="name" placeholder="name"></input>
+                    <label for="send_to">Send To</label>
+                    <input type="text" id="send_to" ng-model="numToNotify" placeholder="numToNotify"></input>
+                    <button type="submit" style= "margin-top:10px;">Update Profile</button>
+            </form>
+            <button ng-hide="hide" ng-click="hideProfile()">Hide Profile</button>
+            
+
+            <button ng-show="show" ng-click="displayProfile()">View Profile</button>
+
+            <h2>The Sensor's current Temperature is <span ng-bind="currentTemp"></span>.</h2>
+
+            <h2>List of Recent Temperature Results:</h2>
+            <div ng-repeat="temperature in allTemps | orderBy: '-ordinal'" style="margin-top:2px;">
+                Sensor temperature was {{temperature.temperature}} degrees at {{temperature.timestamp}}.
+            </div>
+
+            <h2>Log of Threshold Violations:</h2>
+            <div ng-repeat="violation in violations | orderBy: '-ordinal'" style="margin-top:2px;">
+                Threshold Violation temperature was {{violation.violation_temp}} degrees at {{violation.timestamp}}.
+            </div>
+        </div>
+    </div>
+</body>
+</html>
