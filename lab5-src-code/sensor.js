@@ -86,6 +86,7 @@ angular.module('sensorProfile', [])
       var finalURL = upURL + "?threshold="+ $scope.threshold +"&location="+ $scope.location +"&name="+ $scope.name +"&send_to="+ $scope.numToNotify;
       return $http.post(finalURL).success(function(data){
         $scope.displayProfile();
+        $scope.getAllViolations();
       });
     };
 
