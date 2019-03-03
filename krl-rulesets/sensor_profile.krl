@@ -1,7 +1,7 @@
 ruleset sensor_profile {
   meta {
     shares __testing, sensor_location, sensor_name, sensor_threshold, notify_who
-    
+    provides sensor_threshold
     use module wovyn_base alias wovyn
   }
   
@@ -15,20 +15,22 @@ ruleset sensor_profile {
       ]
     }
     
+    default_location = "Provo"
+    
     sensor_location = function() {
-      ent:sensor_loc.defaultsTo(wovyn:temp_location)
+      ent:sensor_loc.defaultsTo(default_location)
     };
     
     sensor_name = function() {
-      ent:sensor_name.defaultsTo(wovyn:temp_name)
+      ent:sensor_name.defaultsTo(wovyn:name)
     };
     
     sensor_threshold = function() {
-      ent:sensor_threshold.defaultsTo(wovyn:temperature_threshold)
+      ent:sensor_threshold.defaultsTo(wovyn:threshold)
     };
     
     notify_who = function() {
-      ent:num_to_notify.defaultsTo(wovyn:send_to_num)
+      ent:num_to_notify.defaultsTo(wovyn:notify_number)
     };
     
   }
@@ -49,4 +51,3 @@ ruleset sensor_profile {
     }
   }
 }
-
