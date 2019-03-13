@@ -1,8 +1,9 @@
 ruleset manage_sensors_lab7 {
   meta {
-    shares __testing, nameFromID, showChildren, sensorCollection
+    shares __testing, nameFromID, showChildren, all_temps, sensorCollection
     
     use module io.picolabs.wrangler alias wrangler
+    use module io.picolabs.subscription alias subscription
   }
   global {
     __testing = { "queries": [{ "name": "__testing" },
@@ -22,9 +23,10 @@ ruleset manage_sensors_lab7 {
     
     sensorCollection = function() {
       ent:sensors.defaultsTo([])
-    };
+    }
     
- all_temps = function() {
+    // Updateded this function to use subscription info to find sensor picos.
+    all_temps = function() {
       host = "http://localhost:8080";
       subscription:established().map(function(v,k) {
         subscription_id = v{"Id"};
@@ -34,7 +36,7 @@ ruleset manage_sensors_lab7 {
         final_answer.put(subscription_id, answer)
       })
     }
-
+    
     send_to_num = +13039018143
     default_threshold = 70
     
@@ -70,6 +72,25 @@ ruleset manage_sensors_lab7 {
     }
   }
   
+  rule sensor_introduced {
+    select when sensor_manager introduce_sensor
+    pre {
+      in_sensor_name = event:attr("name")
+      in_sensor_eci = event:attr("eci")
+    }
+    if in_sensor_name.klog("found sensor_name")
+    then
+      noop()
+    fired {
+       raise wrangler event "subscription"
+        attributes { "name": in_sensor_name,
+                      "Rx_role": "sensor_manager",
+                      "Tx_role": "sensor",
+                      "channel_type": "subscription",
+                      "wellKnown_Tx": in_sensor_eci };
+    }
+  }
+  
   rule store_new_sensor {
     select when wrangler child_initialized
     pre {
@@ -95,20 +116,6 @@ ruleset manage_sensors_lab7 {
       ent:sensors{[sensor_name]} := the_sensor
     }
   }
-  
-  // rule create_child_subscription {
-  //   select when sensor_manager create_subscriptions
-  //   foreach ent:sensors setting(sensor,index)
-  //     // introduce sensor manager pico to sensor[index] pico
-  //     event:send(
-  //       { "eci": ent:my_eci, "eid": "subscription",
-  //         "domain": "wrangler", "type": "subscription",
-  //         "attrs": { "name": "sensor" + (index.as("Number")+1),
-  //                   "Rx_role": "sensor_manager",
-  //                   "Tx_role": "sensor",
-  //                   "channel_type": "subscription",
-  //                   "wellKnown_Tx": sensor } } )
-  // }
   
   rule update_child_profile {
     select when wrangler child_initialized
