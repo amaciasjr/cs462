@@ -20,14 +20,21 @@ ruleset manage_sensors_lab7 {
       wrangler:children()
     }
     
-    // myInfo = function() {
-    //   ent:my_eci.defaultsTo(wrangler:myself(){["eci"]})
-    // }
-    
     sensorCollection = function() {
       ent:sensors.defaultsTo([])
     };
     
+ all_temps = function() {
+      host = "http://localhost:8080";
+      subscription:established().map(function(v,k) {
+        subscription_id = v{"Id"};
+        response = http:get(host + "/sky/cloud/" + v{"Tx"} + "/temperature_store_v2/current_temperature");
+        answer = response{"content"}.decode();
+        final_answer = {};
+        final_answer.put(subscription_id, answer)
+      })
+    }
+
     send_to_num = +13039018143
     default_threshold = 70
     
