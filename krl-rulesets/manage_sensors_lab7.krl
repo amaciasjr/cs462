@@ -91,6 +91,21 @@ ruleset manage_sensors_lab7 {
     }
   }
   
+  rule sensor_threshold_violation {
+    select when sensor_manager threshold_violation
+    pre {
+      to = event:attr("to")
+      from = event:attr("from")
+      message = event:attr("message")
+    }
+    always{
+      raise sensor_manager event "new_message"
+         attributes { "to": to,
+                      "from": from,
+                      "message": message };
+    }
+  }
+  
   rule store_new_sensor {
     select when wrangler child_initialized
     pre {
@@ -103,7 +118,7 @@ ruleset manage_sensors_lab7 {
     event:send(
          { "eci": the_sensor{"eci"}, "eid": "install-ruleset",
            "domain": "wrangler", "type": "install_rulesets_requested",
-           "attrs": { "rids": ["temperature_store_v2", "wovyn_base", "sensor_profile"] } } )
+           "attrs": { "rids": ["temperature_store_v2", "wovyn_base_lab7", "sensor_profile"] } } )
       
     fired {
        raise wrangler event "subscription"

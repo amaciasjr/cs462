@@ -56,6 +56,7 @@ ruleset sensor_profile {
     pre {
       attributes = event:attrs.klog("subcription:")
     }
+    send_directive("text", {"body":"my text response"})
     always {
       raise wrangler event "pending_subscription_approval"
         attributes attributes

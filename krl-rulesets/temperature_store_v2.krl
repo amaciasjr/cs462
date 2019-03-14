@@ -22,7 +22,7 @@ ruleset temperature_store_v2 {
     
     // Returns the contents of the current_temperature entity variable.
     current_temperature = function() {
-      ent:current_temperature.defaultsTo(0)
+      ent:current_temperature.defaultsTo(72)
     };
     
     // Returns the contents of the temperature entity variable.
@@ -40,7 +40,7 @@ ruleset temperature_store_v2 {
     // (Note: You are expected to solve this without adding a rule that 
     // collects in-range temperatures)
     inrange_temperatures = function() {
-      inrange_temps = ent:all_temps.filter(function(obj){ wovyn:temperature_threshold > obj{["temperature"]}.klog("OBJ TEMP: " ) });
+      inrange_temps = ent:all_temps.filter(function(obj){ wovyn:threshold() > obj{["temperature"]}.klog("OBJ TEMP: " ) });
       inrange_temps.klog("inrange_temps value: " )
     };
     
@@ -75,8 +75,8 @@ ruleset temperature_store_v2 {
     select when wovyn threshold_violation
     pre {
       current_time = time:now().klog("Wovyn:Threshold Violation Time ")
-      temperature_threshold = wovyn:temperature_threshold.klog("collect_threshold_violations temperature_threshold: ")
-      passed_temperature = event:attr("temperature").defaultsTo("0")
+      temperature_threshold = event:attr("threshold").defaultsTo(wovyn:threshold()).klog("collect_threshold_violations temperature_threshold: ")
+      passed_temperature = event:attr("temperature").defaultsTo(current_temperature())
       violation_obj = {"timestamp":current_time, "violation_temp" : passed_temperature}
     }
     if passed_temperature > temperature_threshold then
