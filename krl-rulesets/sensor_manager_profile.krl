@@ -42,3 +42,4 @@ ruleset sensor_manager_profile {
    
   }
 }
+

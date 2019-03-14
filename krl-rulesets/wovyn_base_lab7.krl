@@ -96,9 +96,8 @@ ruleset wovyn_base_lab7 {
     select when wovyn threshold_violation
     // PRELUDE SECTION
     pre {
-      subscription_role = subscription:established[0]{"Tx_role"}
-      sensor_manager_eci = subscription:established[0]{"Tx"}
-      subscription_id = subscription:established[0]{"Id"}
+      subscription_role = subscription:established()[0]{"Tx_role"}.klog("subscription_role: ")
+      sensor_manager_eci = subscription:established()[0]{"Tx"}.klog("sensor_manager_eci: ")
     }
     
     // ACTION SECTION
@@ -109,7 +108,7 @@ ruleset wovyn_base_lab7 {
              "domain": "sensor_manager", "type": "threshold_violation",
              "attrs": { "to": send_to_num,
                       "from": send_from_num,
-                      "message": "Message from " + wrangler:myself(){"name"} } } )
+                      "message": "Threshold violation message from " + wrangler:myself(){"name"} } } )
 
     // POSTLUDE SECTION
     fired {
@@ -141,3 +140,4 @@ ruleset wovyn_base_lab7 {
     }
   }
 }
+

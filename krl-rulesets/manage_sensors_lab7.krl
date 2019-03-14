@@ -94,11 +94,13 @@ ruleset manage_sensors_lab7 {
   rule sensor_threshold_violation {
     select when sensor_manager threshold_violation
     pre {
-      to = event:attr("to")
-      from = event:attr("from")
-      message = event:attr("message")
+      to = event:attr("to").klog("sensor_threshold_violation to: ")
+      from = event:attr("from").klog("sensor_threshold_violation from: ")
+      message = event:attr("message").klog("sensor_threshold_violation message: ")
     }
-    always{
+    if message then
+      noop()
+    fired{
       raise sensor_manager event "new_message"
          attributes { "to": to,
                       "from": from,
