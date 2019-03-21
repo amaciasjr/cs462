@@ -25,6 +25,14 @@ ruleset manage_sensors_lab8 {
       ent:sensors.defaultsTo([])
     }
     
+    sensorTempReports = function() {
+      ent:temp_reports.defaultsTo({})
+    }
+    
+    respondingSensorsCount = function() {
+      ent:sensor_response_count.defaultsTo(0)
+    }
+    
     // Updateded this function to use subscription info to find sensor picos.
     all_temps = function() {
       host = "http://localhost:8080";
@@ -124,7 +132,7 @@ ruleset manage_sensors_lab8 {
     event:send(
          { "eci": the_sensor{"eci"}, "eid": "install-ruleset",
            "domain": "wrangler", "type": "install_rulesets_requested",
-           "attrs": { "rids": ["temperature_store_v2", "wovyn_base_lab7", "sensor_profile"] } } )
+           "attrs": { "rids": ["temperature_store_v2", "wovyn_base_lab8", "sensor_profile"] } } )
       
     fired {
        raise wrangler event "subscription"
@@ -195,7 +203,21 @@ ruleset manage_sensors_lab8 {
           "domain": "sensor", "type": "temp_report",
           "attrs": updated_attrs } )
   }
-   
   
+  rule seonsors_temp_report_received {
+    select when sensor_manager receive_temp_report
+    pre {
+      all_event_attrs = event:attrs.klog("ATTRS AFTER REPORT: ")
+      rcn = event:attr("report_correlation_number").klog("REPORT #: ")
+      temp_report = event:attr("temp_report").klog("A TEMP REPORT: ")
+      temp_report_obj = {}
+      report_obj = temp_report_obj.put([rcn], temp_report).klog("Report OBJ: ")
+    }
+    if ent:temp_reports{rcn} == null then noop()
+    fired{
+      ent:temp_reports := sensorTempReports().put(report_obj);
+      ent:sensor_response_count := respondingSensorsCount() + 1;
+    }
+  }
 }
 

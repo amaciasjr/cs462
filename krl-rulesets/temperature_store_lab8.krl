@@ -53,7 +53,7 @@ ruleset temperature_store_v2 {
   rule collect_temperatures {
     select when wovyn new_temperature_reading
     pre {
-      current_time = event:attr("timestamp").klog("Wovyn:New Temp Reading Time ")
+      current_time = time:now().klog("Wovyn:New Temp Reading Time ")
       passed_temperature = event:attr("temperature").defaultsTo("0")
       temp_obj = {"timestamp":current_time, "temperature" : passed_temperature}
     }
@@ -111,9 +111,12 @@ ruleset temperature_store_v2 {
       event_attr = event:attrs.klog("EVENT ATTRS RECEIVED")
       my_rx = meta:eci //rx of subscription
       originator = subscription:established("Rx",my_rx)[0]{"Tx"}.klog("ORIGINATOR")
-      
+      updated_attrs = event:attrs.put(["temp_report"], temperatures());
     }
-    
+    event:send(
+        { "eci": originator, "eid": "sensor_temp_report",
+          "domain": "sensor_manager", "type": "receive_temp_report",
+          "attrs": updated_attrs } )
   }
 }
 
