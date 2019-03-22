@@ -108,10 +108,11 @@ ruleset temperature_store_v2 {
   rule send_temp_report {
     select when sensor temp_report
     pre {
-      event_attr = event:attrs.klog("EVENT ATTRS RECEIVED")
-      my_rx = meta:eci //rx of subscription
-      originator = subscription:established("Rx",my_rx)[0]{"Tx"}.klog("ORIGINATOR")
-      updated_attrs = event:attrs.put(["temp_report"], temperatures());
+      my_rx = meta:eci //rx of subscription;
+      originator = subscription:established("Rx",my_rx)[0]{"Tx"}.klog("ORIGINATOR");
+      temp_reporting_sensor = {};
+      reporting_sensor = temp_reporting_sensor.put([my_rx], temperatures());
+      updated_attrs = event:attrs.put(["temp_report"], reporting_sensor);
     }
     event:send(
         { "eci": originator, "eid": "sensor_temp_report",

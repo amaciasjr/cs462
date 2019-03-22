@@ -1,6 +1,6 @@
 ruleset manage_sensors_lab8 {
   meta {
-    shares __testing, nameFromID, showChildren, all_temps, sensorCollection
+    shares __testing, nameFromID, showChildren, all_temps, sensorCollection, last_five_temp_reports
     
     use module io.picolabs.wrangler alias wrangler
     use module io.picolabs.subscription alias subscription
@@ -29,8 +29,22 @@ ruleset manage_sensors_lab8 {
       ent:temp_reports.defaultsTo({})
     }
     
-    respondingSensorsCount = function() {
-      ent:sensor_response_count.defaultsTo(0)
+    // A function that returns a JSON structure with the five latest collection temperature reports.
+    last_five_temp_reports = function() {
+      temp_reports = sensorTempReports(); 
+      temp_report0 = [];
+      recent_keys = sensorTempReports().keys().sort(function(a, b) {
+                            a > b  => -1 |
+                            a == b =>  0 |
+                                      1
+                          }).slice(0,4).klog();
+      recent_keys;
+      temp_report1 = temp_report0.append(temp_reports{recent_keys[0]});
+      temp_report2 = temp_report1.append(temp_reports{recent_keys[1]});
+      temp_report3 = temp_report2.append(temp_reports{recent_keys[2]});
+      temp_report4 = temp_report3.append(temp_reports{recent_keys[3]});
+      five_most_recent_reports = temp_report4.append(temp_reports{recent_keys[4]});
+      five_most_recent_reports
     }
     
     // Updateded this function to use subscription info to find sensor picos.
@@ -193,31 +207,42 @@ ruleset manage_sensors_lab8 {
     select when sensor_manager sensors_temp_report
       foreach subscription:established("Tx_role","sensor").klog("SENSOR: ") setting (sensor)
       pre{
+        temp_sensors = all_temps().length().klog("NUMBER OF TEMP SENSORS: ")
         my_tx = sensor{"Tx"};
         new_rcn = genCorrelationNum();
         rcn = event:attr("report_correlation_number").defaultsTo(new_rcn);
         updated_attrs = event:attrs.put(["report_correlation_number"], rcn);
+        passing_obj = {}
+        report_object = passing_obj.put([rcn], {"report_start_time": time:now(),"temperature_sensors": temp_sensors , "responding": 0, "temperatures": {}}).klog("Report OBJ 1: ")
+        final_attrs = updated_attrs.put(report_object)
       }
       event:send(
         { "eci": my_tx, "eid": "sensor_temp_report",
           "domain": "sensor", "type": "temp_report",
-          "attrs": updated_attrs } )
+          "attrs": final_attrs } )
+      fired {
+        ent:temp_reports := sensorTempReports().put(report_object).klog("TEMP REPORT Val 1: ");
+      }
   }
   
   rule seonsors_temp_report_received {
     select when sensor_manager receive_temp_report
     pre {
-      all_event_attrs = event:attrs.klog("ATTRS AFTER REPORT: ")
-      rcn = event:attr("report_correlation_number").klog("REPORT #: ")
-      temp_report = event:attr("temp_report").klog("A TEMP REPORT: ")
-      temp_report_obj = {}
-      report_obj = temp_report_obj.put([rcn], temp_report).klog("Report OBJ: ")
+      temp_reports = ent:temp_reports
+      rcn = event:attr("report_correlation_number");
+      temp_report = event:attr("temp_report");
+      curr_report = temp_reports{rcn};
+      report_started = curr_report{"report_start_time"};
+      total_sensors_in_report = curr_report{"temperature_sensors"};
+      new_temperatures = curr_report{"temperatures"}.put(temp_report);
+      new_resp_val = curr_report{"responding"} + 1;
+      holder_obj = {};
+      report_object = holder_obj.put([rcn], {"report_start_time": report_started,"temperature_sensors": total_sensors_in_report , "responding": new_resp_val, "temperatures": new_temperatures }).klog("Report OBJ 2: ")
     }
-    if ent:temp_reports{rcn} == null then noop()
-    fired{
-      ent:temp_reports := sensorTempReports().put(report_obj);
-      ent:sensor_response_count := respondingSensorsCount() + 1;
+    fired {
+      ent:temp_reports := sensorTempReports().put(report_object).klog("TEMP REPORT Val 2: ");
     }
+    
   }
 }
 
