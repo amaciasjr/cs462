@@ -1,16 +1,19 @@
 ruleset gossip {
   meta {
-    shares __testing
+    shares __testing, get_sequence_number, get_all_gossip, get_peers_logs
     
     use module io.picolabs.wrangler alias wrangler
     use module io.picolabs.subscription alias subscription
   }
   global {
     __testing = { "queries":
-      [ { "name": "__testing" }
+      [ { "name": "__testing" },
+        { "name": "get_sequence_number" },
+        { "name": "get_all_gossip" },
+        { "name": "get_peers_logs" }
       //, { "name": "entry", "args": [ "key" ] }
       ] , "events":
-      [ //{ "domain": "d1", "type": "t1" }
+      [ { "domain": "gossip", "type": "new_temp", "attrs": [ "temperature" ]  }
       //, { "domain": "d2", "type": "t2", "attrs": [ "a1", "a2" ] }
       ]
     }
@@ -36,6 +39,17 @@ ruleset gossip {
       gossip_message
     }
     
+    get_peers_logs = function() {
+      host = "http://localhost:8080";
+      subscription:established().map(function(v,k) {
+        subscription_id = v{"Id"};
+        response = http:get(host + "/sky/cloud/" + v{"Tx"} + "/gossip/get_all_gossip");
+        log = response{"content"}.decode();
+        log_collection = {};
+        log_collection.put(subscription_id, log)
+      })
+    }
+    
     
     // Entity varibles: all_logs, "smart_tracker" = only peer seen massages,
     // implement the smart tracker with a root map that has originator of message
@@ -57,15 +71,16 @@ ruleset gossip {
       then noop()
     
     fired {
-      ent:gossip_messages := get_all_gossip().append(gossip_message)
+      ent:gossip_messages := get_all_gossip().append(gossip_message);
+      ent:message_number := get_sequence_number() + 1;
     }
     else {
-      
+      // DO NOTHING FOR NOW!
     }
   }
   
   // This needs to be a scheduled event that happens periodically.
-  // Also, needs to send message typ randomly (use random library).
+  // Also, needs to send message type randomly (use random library).
   rule gossip_heartbeat_happened {
     select when gossip heartbeat
     pre {}
