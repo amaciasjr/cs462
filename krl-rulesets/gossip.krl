@@ -14,7 +14,8 @@ ruleset gossip {
         { "name": "peers_logs" }
       //, { "name": "entry", "args": [ "key" ] }
       ] , "events":
-      [ { "domain": "gossip", "type": "new_temp", "attrs": [ "temperature" ]  }
+      [ { "domain": "gossip", "type": "new_temp", "attrs": [ "temperature" ]  },
+        { "domain": "gossip", "type": "heartbeat"}
       //, { "domain": "d2", "type": "t2", "attrs": [ "a1", "a2" ] }
       ]
     }
@@ -31,6 +32,10 @@ ruleset gossip {
     
     temp_logs = function() {
       ent:temperature_logs => ent:temperature_logs | {}
+    }
+    
+    heartbeat_time = function() {
+      ent:heartbeat_time => ent:heartbeat_time | 10
     }
     
     generate_seen_message = function() {
@@ -66,10 +71,10 @@ ruleset gossip {
     
     // get_peer() needs to return a "subscription eci" associated with the peer's PicoID
     get_peer = function() {
-      my_messages = get_all_gossip().klog("Current State: ");
+      // my_messages = get_all_gossip().klog("Current State: ");
       subscription:established().map(function(v,k) {
-        subscription_id = v{"Id"};
-        subscription_id
+        subscription_Tx = v{"Tx"};
+        subscription_Tx
       });
       
     }
@@ -117,9 +122,11 @@ ruleset gossip {
     select when gossip heartbeat
     pre {
       // choose a peer to send a message to.
-      subscriber = get_peer(); // returns a "subscription eci"
-      rand_int = random:integer(1) //returns random integer where rand_int = 0 || 1
-      updated_attrs = event:attrs.put(["subscriber"], subscriber); // adds that peer to the event:attrs
+      subscriber = get_peer().klog("Result of get_peer(): "); // returns a "subscription eci"
+      num_of_peers = subscriber.length();
+      rand_peer = random:integer(num_of_peers - 1);
+      rand_int = random:integer(1); //returns random integer where rand_int = 0 || 1
+      updated_attrs = event:attrs.put(["subscriber"], subscriber[rand_peer]); // adds that peer to the event:attrs
     }
     //action:
     if rand_int == 0 
@@ -127,13 +134,19 @@ ruleset gossip {
     fired{
       raise gossip event "send_rumor"
          attributes updated_attrs;
-      schedule gossip event "heartbeat" repeat "*/5  *  * * * *" 
-        attributes event:attrs;
+      raise gossip event "schedule_heartbeat"
     }
     else{
       raise gossip event "send_seen"
          attributes updated_attrs;
-      schedule gossip event "heartbeat" repeat "*/5  *  * * * *" 
+      raise gossip event "schedule_heartbeat"
+    }
+  }
+  
+  rule schedule_gossip_heartbeat {
+    select when gossip schedule_heartbeat
+    always{
+      schedule gossip event "heartbeat" at time:add(time:now(), {"seconds": heartbeat_time()})
         attributes event:attrs;
     }
   }
@@ -163,7 +176,7 @@ ruleset gossip {
       seen_message = generate_seen_message();
       updated_attrs = event:attrs.put(["message"], seen_message); // adds message to the event:attrs
     }
-    if subscriber
+    if peer_eci
       then
         event:send(
                     { "eci": peer_eci, "eid": "send-seen-message",
@@ -177,6 +190,7 @@ ruleset gossip {
     select when gossip rumor_recieved
     pre {}
     //action:
+    send_directive("Pico: " + meta:picoId + " got a Rumor!")
     fired{
       
     }
@@ -191,6 +205,7 @@ ruleset gossip {
     select when gossip seen_received
     pre {}
     //action:
+    send_directive("Pico: " + meta:picoId + " got a Seen!")
     fired{
       
     }
