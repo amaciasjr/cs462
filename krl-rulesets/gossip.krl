@@ -1,6 +1,6 @@
 ruleset gossip {
   meta {
-    shares __testing, sequence_number, my_gossip, peers_logs, get_peers, temp_logs
+    shares __testing, sequence_number, my_gossip, peers_seen_message, get_peers, temp_logs, my_seen_messages
     
     use module io.picolabs.wrangler alias wrangler
     use module io.picolabs.subscription alias subscription
@@ -11,8 +11,9 @@ ruleset gossip {
         { "name": "sequence_number" },
         { "name": "my_gossip" },
         { "name": "get_peers" },
-        { "name": "peers_logs" },
-        { "name": "temp_logs" }
+        { "name": "peers_seen_message" },
+        { "name": "temp_logs" },
+        { "name": "my_seen_messages" }
       //, { "name": "entry", "args": [ "key" ] }
       ] , "events":
       [ { "domain": "gossip", "type": "new_temp", "attrs": [ "temperature" ]  },
@@ -45,8 +46,8 @@ ruleset gossip {
       rand_peer
     }
     
-    generate_seen_message = function() {
-      
+    my_seen_messages = function() {
+      ent:temperature_logs.map(function(v,k) {v.length()});
     }
     
     // Get specific rumor message(s) that a given peer needs.
@@ -65,15 +66,20 @@ ruleset gossip {
       gossip_message
     }
     
-    peers_logs = function() {
+    peers_seen_message = function() {
       host = "http://localhost:8080";
-      subscription:established().map(function(v,k) {
-        subscription_id = v{"Id"};
-        response = http:get(host + "/sky/cloud/" + v{"Tx"} + "/gossip/my_gossip");
+      arrayOfKey = subscription:established().map(function(v,k) {
+        temp = {};
+        key = v{"Tx"};
+        response = http:get(host + "/sky/cloud/" + v{"Tx"} + "/gossip/my_seen_messages");
         log = response{"content"}.decode();
-        log_collection = {};
-        log_collection.put(subscription_id, log)
-      })
+        temp{key} = log;
+        temp
+      });
+      
+      arrayOfKey.reduce(function(a,b) {
+        a.put(b)
+      },{})
     }
     
     // get_peers() needs to return a "subscription eci" associated with the peer's PicoID
@@ -100,7 +106,7 @@ ruleset gossip {
       my_pico_id     = meta:picoId.klog("Pico ID: ");
       temp_received  = (event:attr("temperature") => event:attr("temperature") | null).klog("Received Temp: "); 
       time_received  = time:now().klog("Time Received: "); 
-      rumor_message = generate_rumor_message(my_pico_id, temp_received, time_received);
+      rumor_message  = generate_rumor_message(my_pico_id, temp_received, time_received);
     }
     // Check if rumor_message was created.
     if rumor_message
@@ -108,6 +114,7 @@ ruleset gossip {
     
     fired {
       ent:gossip_messages := my_gossip().append(rumor_message);
+      ent:temperature_logs{my_pico_id} := ent:gossip_messages;
       ent:message_number := sequence_number() + 1;
     }
     else {
@@ -177,7 +184,7 @@ ruleset gossip {
     select when gossip send_seen
     pre{
       peer_eci = event:attr("subscriber").klog("Send Seen to: ");
-      seen_message = generate_seen_message();
+      seen_message = my_seen_messages();
       updated_attrs = event:attrs.put(["message"], seen_message); // adds message to the event:attrs
     }
     event:send( { "eci": peer_eci, "eid": "send-seen-message",
