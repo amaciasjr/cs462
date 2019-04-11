@@ -1,31 +1,30 @@
 ruleset gossip {
   meta {
-    shares __testing, sequence_number, my_gossip, peers_seen_message, get_peers, temp_logs, my_seen_messages
+    shares __testing, sequence_number, my_gossip, get_peers, temp_logs, seen_messages
     
     use module io.picolabs.wrangler alias wrangler
     use module io.picolabs.subscription alias subscription
   }
   global {
-    __testing = { "queries":
-      [ { "name": "__testing" },
-        { "name": "sequence_number" },
-        { "name": "my_gossip" },
-        { "name": "get_peers" },
-        { "name": "peers_seen_message" },
+    __testing = { 
+      "queries":[ 
+        { "name": "__testing" },
         { "name": "temp_logs" },
-        { "name": "my_seen_messages" }
-      //, { "name": "entry", "args": [ "key" ] }
-      ] , "events":
-      [ { "domain": "gossip", "type": "new_temp", "attrs": [ "temperature" ]  },
+        { "name": "seen_messages" },
+        { "name": "my_gossip" },
+        { "name": "sequence_number" },
+        { "name": "get_peers" }
+      //{ "name": "entry", "args": [ "key" ] }
+      ] , 
+      "events":[ 
+        { "domain": "gossip", "type": "new_temp", "attrs": [ "temperature" ]  },
         { "domain": "gossip", "type": "heartbeat"}
       //, { "domain": "d2", "type": "t2", "attrs": [ "a1", "a2" ] }
       ]
     }
     
-    // functions: generate_gossip_message(), get_peers(), update_logs(),
-    // get_my_logs(),
     sequence_number = function() {
-      ent:message_number => ent:message_number | 0
+      my_gossip().length() - 1
     }
     
     my_gossip = function() {
@@ -34,6 +33,10 @@ ruleset gossip {
     
     temp_logs = function() {
       ent:temperature_logs => ent:temperature_logs | {}
+    }
+    
+    seen_messages = function() {
+      ent:seen_messages => ent:seen_messages | {}
     }
     
     heartbeat_time = function() {
@@ -46,17 +49,8 @@ ruleset gossip {
       rand_peer
     }
     
-    my_seen_messages = function() {
-      ent:temperature_logs.map(function(v,k) {v.length()});
-    }
-    
-    // Get specific rumor message(s) that a given peer needs.
-    find_rumor_messages = function(peer_eci) {
-      
-    }
-    
     generate_rumor_message = function( picoId, temperature, timestamp  ) {
-      message_id = picoId + ":" + sequence_number().as("String");
+      message_id = picoId + ":" + my_gossip().length().as("String").klog("Gen. Rum. Gossip Size: ");
       gossip_message = {
         "MessageID": message_id,
         "SensorID": picoId,
@@ -66,20 +60,20 @@ ruleset gossip {
       gossip_message
     }
     
-    peers_seen_message = function() {
-      host = "http://localhost:8080";
-      arrayOfKey = subscription:established().map(function(v,k) {
-        temp = {};
-        key = v{"Tx"};
-        response = http:get(host + "/sky/cloud/" + v{"Tx"} + "/gossip/my_seen_messages");
-        log = response{"content"}.decode();
-        temp{key} = log;
-        temp
-      });
+    // Get specific rumor message(s) that a given peer needs.
+    find_rumor_messages = function(peer_eci) {
+      my_messages = my_gossip();
+      exists = seen_messages().filter(function(v,k){k == peer_eci}).klog("EXISTS IN FIND RUMOR: ");
+      rumor_to_send = ((exists == {}).klog("TRUE/FALSE: ") => my_messages[0] | compare_seen(peer_eci, exists).klog("What is exists: ") ).klog("RUMOR BEING SENT: ");
+      rumor_to_send
+    }
+    
+    compare_seen = function(peer, seen_messages) {
       
-      arrayOfKey.reduce(function(a,b) {
-        a.put(b)
-      },{})
+    }
+    
+    verify_originator = function(picoId) {
+      temp_logs().filter(function(v,k){k == picoId})
     }
     
     // get_peers() needs to return a "subscription eci" associated with the peer's PicoID
@@ -91,11 +85,7 @@ ruleset gossip {
       });
       
     }
-    
-    
-    // Entity varibles: all_logs, "smart_tracker" = only peer seen massages,
-    // implement the smart tracker with a root map that has originator of message
-    // keyed to an array that contains a sequence of messages.
+
   }
   
   // This rule listens for new temperature readings,
@@ -103,22 +93,23 @@ ruleset gossip {
   rule new_temp_recieved {
     select when gossip new_temp
     pre {
+      pico_id_map = {}
       my_pico_id     = meta:picoId.klog("Pico ID: ");
       temp_received  = (event:attr("temperature") => event:attr("temperature") | null).klog("Received Temp: "); 
       time_received  = time:now().klog("Time Received: "); 
       rumor_message  = generate_rumor_message(my_pico_id, temp_received, time_received);
+      
     }
     // Check if rumor_message was created.
     if rumor_message
       then noop()
     
     fired {
+      pico_id_map{my_pico_id} = my_gossip().length().klog("Gossip Size-1: ");
       ent:gossip_messages := my_gossip().append(rumor_message);
       ent:temperature_logs{my_pico_id} := ent:gossip_messages;
-      ent:message_number := sequence_number() + 1;
-    }
-    else {
-      // DO NOTHING FOR NOW!
+      ent:seen_messages{my_pico_id} := pico_id_map;
+      // ent:message_number := sequence_number() + 1;
     }
   }
   
@@ -140,7 +131,7 @@ ruleset gossip {
       rand_peer = rand_int(subscribers).klog("Random Peer #: ");
       rand_subscriber = subscribers[rand_peer].klog("Random Peer: ");
       updated_attrs = event:attrs.put(["subscriber"], rand_subscriber); // adds that peer to the event:attrs
-      rand_message = random:integer(1)
+      rand_message = 0//random:integer(1)
     }
     //action:
     if rand_message == 1 then
@@ -168,14 +159,38 @@ ruleset gossip {
     select when gossip send_rumor
     pre {
       peer_eci = event:attr("subscriber").klog("Send Rumor to: ");
-      rumor_messages = find_rumor_messages(peer_eci);
-      updated_attrs = event:attrs.put(["message"], rumor_messages); // adds message to the event:attrs
+      rumor_message = find_rumor_messages(peer_eci).klog("Rumor: ");
+      updated_attrs = event:attrs.put(["rumor_message"], rumor_message); // adds message to the event:attrs
+      
     }
     event:send( { "eci": peer_eci, "eid": "send-rumor-message",
                   "domain": "gossip", "type": "rumor_recieved",
                   "attrs": updated_attrs } )
     fired {
+      // ent:seen_messages{peer_eci} := rumor_message{"MessageID"}
       // raise gossip event "schedule_heartbeat"
+      //   attributes updated_attrs;
+      
+    }
+  }
+  
+  // Rule that reacts to another pico sending a rumor message.
+  // Essentially, update my logs.
+  rule rumor_message_received {
+    select when gossip rumor_recieved
+    pre {
+      rumor_recieved = event:attr("rumor_message").klog("Rumor Received: ");
+      message_originator = rumor_recieved{"SensorID"}
+      exists = verify_originator(message_originator)
+      temp = []
+      // message_exists = verify_message(rumor_recieved{"MessageID"})
+    }
+    if (exists != {} ) then
+    send_directive("Pico: " + meta:picoId + " got a Rumor message: " + rumor_recieved)
+    fired {
+      ent:temperature_logs{message_originator} := ent:temperature_logs{message_originator}.append(rumor_recieved);
+    } else {
+      ent:temperature_logs{message_originator} := temp.append(rumor_recieved);
     }
   }
   
@@ -184,8 +199,8 @@ ruleset gossip {
     select when gossip send_seen
     pre{
       peer_eci = event:attr("subscriber").klog("Send Seen to: ");
-      seen_message = my_seen_messages();
-      updated_attrs = event:attrs.put(["message"], seen_message); // adds message to the event:attrs
+      updated_attrs = event:attrs.put(["seen_messages"], temp_logs()).klog("Send_seen UPDATED ATTRS: ");
+      
     }
     event:send( { "eci": peer_eci, "eid": "send-seen-message",
                   "domain": "gossip", "type": "seen_received",
@@ -195,36 +210,27 @@ ruleset gossip {
     }
   }
   
-  // Rule that reacts to another pico sending a rumor message.
-  // Essentially, update my logs.
-  rule rumor_message_received {
-    select when gossip rumor_recieved
-    pre {}
-    //action:
-    send_directive("Pico: " + meta:picoId + " got a Rumor!")
-    fired {
-      
-    }
-    else {
-      
-    }
-  }
-  
   // Rule that reacts to another pico sending a seen message.
   // Essentially, update my seen messages to match the info I have just recieved from originator.
   rule seen_message_received {
     select when gossip seen_received
-    pre {}
-    //action:
-    send_directive("Pico: " + meta:picoId + " got a Seen!")
-    fired {
-      
+    foreach event:attr("seen_messages").defaultsTo({}) setting (messageArray,picoId)
+    pre {
+      pId_messageSize_map = {}
+      array = messageArray.klog("REC seen array: ");
+      ID =  picoId.klog("REC seen ID: ")
+      pId_messageSize_map{picoId} =  messageArray.length() - 1;
     }
-    else {
-      
+    //action:
+    if event:attr("seen_messages") == {}
+      then noop()
+    fired {
+      // May use this later to propagate messages faster. 
+    }
+    else{
+      ent:seen_messages{picoId} := pId_messageSize_map;
     }
   }
   
 }
-
 
